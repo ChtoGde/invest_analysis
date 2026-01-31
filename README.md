@@ -34,7 +34,17 @@
 ## Настройка
 
 1. Создайте токен в Т-банке (никому не сообщайте токен и не храните на виду).
-2. Потом допишу.
+2. Клонируйте репозиторий, введите в консоль:
+    _git clone https://github.com/ChtoGde/invest_analysis_
+    далее
+    _cd invest_analysis_
+4. Создайте виртуально окружение:
+    _python -m venv venv_
+    _venv\Scripts\activate_
+5. Установите необходимые библиотеки:
+    _pip install -r requirements.txt_
+6. В файле _main.py_ в строке 13 где _my_client = MyClient(TOKEN)_ вставить свой токен в поле для токена.
+7. Запустить код
 
 ---
 
