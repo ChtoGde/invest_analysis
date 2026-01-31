@@ -153,7 +153,7 @@ class Analysis():
         return buy_list, sell_list
 
 
-    def save_to_exсel(self, buy_list, sell_list):
+    def save_to_excel(self, buy_list, sell_list):
         """Сохранение результатов в Excel"""
         # Объединение двух сигналов в один датафрейм
         signals = pd.concat([
