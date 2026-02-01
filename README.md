@@ -37,12 +37,13 @@ _Эта программа — инструмент анализа, а не со
 
 1. Создайте токен в Т-банке (никому не сообщайте токен и не храните на виду).
 2. Клонируйте репозиторий, введите в консоль:
-    _git clone https://github.com/ChtoGde/invest_analysis cd invest_analysis_
+    * git clone https://github.com/ChtoGde/invest_analysis
+    * cd invest_analysis
 4. Создайте виртуально окружение:
-    _python -m venv venv_
-    _venv\Scripts\activate_
+    * python -m venv venv
+    * venv\Scripts\activate
 5. Установите необходимые библиотеки:
-    _pip install -r requirements.txt_
+    * pip install -r requirements.txt
 6. В файле _main.py_ в строке 13 где _my_client = MyClient(TOKEN)_ вставить свой токен в поле для токена.
 7. Запустить код
 
@@ -66,4 +67,11 @@ _Эта программа — инструмент анализа, а не со
 
 ## Пример вывода
 
-(https://iimg.su/i/kPf9AL)
+(result.png)
+
+---
+
+## Что можно улучшить?
+
+1. Добавить анализ новостных и покупательских настроений вокруг акций, как одно из измерений
+2. Реализовать модель машинного обучения, для автоматичесого определения весов фундаментальных показателей и более точных прогнозов.
