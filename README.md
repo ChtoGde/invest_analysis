@@ -27,7 +27,7 @@ _Эта программа — инструмент анализа, а не со
 - **Python 3.12+**
 - `pandas`, `numpy` — обработка данных
 - `scikit-learn` — нормализация (`minmax_scale`)
-- `t_tech.invest` — клиент API для доступа к данным Tinkoff Invest
+- `t_tech.invest` — клиент API для доступа к данным T-банка
 - `openpyxl` — запись в Excel
 - `datetime` — работа с датами
 

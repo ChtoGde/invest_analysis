@@ -2,13 +2,19 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import minmax_scale
 from datetime import datetime
+from openpyxl.styles import PatternFill
 
 np.random.seed(42)  # Для воспроизводимости результатов
 
 
 
 class Analysis():
-    def __init__(self, prices, fundamentals):
+    def __init__(self):
+        try:
+            prices = pd.read_csv('candles.csv', index_col='Date', parse_dates=['Date'])
+            fundamentals = pd.read_csv('fundamentals.csv', index_col=0).T
+        except FileNotFoundError:
+            'Файлы не существуют, сначала используйте метод get_candles_and_fundamentals()'
         # Загрузка данных
         self.__prices = prices
         self.__fundamentals = fundamentals
@@ -121,8 +127,8 @@ class Analysis():
             buy_signal = (score >= 6) and (not pd.isna(calc_rsi)) and (calc_rsi < 50) and (pe < 15) and (roe > 10)
             sell_signal = (not pd.isna(calc_rsi)) and (calc_rsi > 70) and (not pd.isna(calc_z)) and (calc_z > 2)
             # Цены для лучшей покупки и продажи
-            ideal_buy_price = max(support, current_price * 0.95, (support + current_price) / 2)
-            ideal_sell_price = min(resistance, current_price * 1.15)
+            # ideal_buy_price = max(support, current_price * 0.95, (support + current_price) / 2)
+            ideal_sell_price = min(resistance, current_price * 1.20)
 
             # Формируем результат
             results.append({
@@ -130,7 +136,7 @@ class Analysis():
                 'Актуальная цена': round(current_price, 2),
                 'Поддержка': round(support, 2),
                 'Сопротивление': round(resistance, 2),
-                'Покупать по': round(ideal_buy_price, 2),
+                #'Покупать по': round(ideal_buy_price, 2),
                 'Продавать по': round(ideal_sell_price, 2),
                 'RSI': round(calc_rsi, 2) if not pd.isna(calc_rsi) else None,
                 'Z-Score': round(calc_z, 2) if not pd.isna(calc_z) else None,
@@ -203,7 +209,51 @@ class Analysis():
             stock_tracker_0.to_excel(writer, index=True, sheet_name='Recomendations')
             stock_tracker_1.to_excel(writer, index=True, sheet_name='Trade_History')
 
-            print('Запись в Exel файл успешно завершена')
+
+            ws0 = writer.sheets['Recomendations']
+
+            green_fill = PatternFill(start_color='C6EFCE', end_color='C6EFCE', fill_type='solid')  # Светло‑зелёный
+            red_fill = PatternFill(start_color='FFC7CE', end_color='FFC7CE', fill_type='solid')    # Светло‑красный
+
+
+            def get_col_idx(worksheet, col_name):
+                for col in range(1, worksheet.max_column + 1):
+                    if worksheet.cell(row=1, column=col).value == col_name:
+                        return col
+                return None
+
+
+            col_signal = get_col_idx(ws0, 'Сигнал')
+            col_change = get_col_idx(ws0, 'Изменение (%)')
+
+            if col_signal and col_change:
+                for row in range(2, ws0.max_row + 1):  # пропускаем заголовок (строка 1)
+                    cell_signal = ws0.cell(row=row, column=col_signal)
+                    cell_change = ws0.cell(row=row, column=col_change)
+
+
+                    # Цвет для "Сигнал": зелёный если "Покупка", красный если "Продажа"
+                    if cell_signal.value == 'Покупка':
+                        cell_signal.fill = green_fill
+                    elif cell_signal.value == 'Продажа':
+                        cell_signal.fill = red_fill
+
+
+                    # Цвет для "Изменение (%)":
+                    change_val = cell_change.value
+                    if isinstance(change_val, (int, float)):
+                        if cell_signal.value == 'Покупка':
+                            if change_val >= 0:
+                                cell_change.fill = green_fill
+                            else:
+                                cell_change.fill = red_fill
+                        elif cell_signal.value == 'Продажа':
+                            if change_val < 0:
+                                cell_change.fill = green_fill
+                            else:
+                                cell_change.fill = red_fill
+
+            print('Запись в Excel файл успешно завершена')
 
 
 

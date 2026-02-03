@@ -1,6 +1,7 @@
 from t_tech.invest import Client, CandleInterval, GetAssetFundamentalsRequest
 from datetime import datetime, timedelta
 import pandas as pd
+import os
 
 
 class MyClient(Client):
@@ -26,33 +27,45 @@ class MyClient(Client):
                             self.tickers_assets[ticker] = asset.uid
 
 
-    def get_candles(self):
+    def get_candles_and_fundamentals(self):
         """Метод получения свечей за 5 лет с сохранением в .csv"""
         with Client(self.token) as client:
             self.candles_data = {}
 
-            # определяем срок от "5 лет назад" до "сегодня"
+            # сегодняшняя дата
             now = datetime.now()
-            five_years_old = now - timedelta(days=365*5)
+            # если файл существует, то берем дату последней свечи из файла
+            if os.path.exists('candles.csv'):
+                cf = pd.read_csv('candles.csv', index_col='Date', parse_dates=['Date'])
+                start_date = cf.index.max()
+            else:
+                # иначе берем 5 лет назад
+                start_date = now - timedelta(days=365*5)
 
-            # получаем свечи для каждого тикера за указанный срок
-            for ticker, figi in self.tickers_figi.items():
-                candles = client.market_data.get_candles(figi=figi, from_=five_years_old, to=now, interval=CandleInterval.CANDLE_INTERVAL_DAY).candles
-                df = pd.DataFrame([{
-                    "Date": candle.time.date(),
-                    "Close": self._quotation_to_float(candle.close) # берем только свечи закрытия
-                    }
-                    for candle in candles])
-                df.set_index("Date", inplace=True) # установка индекса по 'Date'
-                self.candles_data[ticker] = df["Close"]
+            if (now - start_date).days > 1:
+                # получаем свечи для каждого тикера за указанный срок
+                for ticker, figi in self.tickers_figi.items():
+                    candles = client.market_data.get_candles(figi=figi, from_=start_date, to=now, interval=CandleInterval.CANDLE_INTERVAL_DAY).candles
+                    df = pd.DataFrame([{
+                        "Date": candle.time.date(),
+                        "Close": self._quotation_to_float(candle.close) # берем только свечи закрытия
+                        }
+                        for candle in candles])
+                    df.set_index("Date", inplace=True) # установка индекса по 'Date'
+                    self.candles_data[ticker] = df["Close"]
 
-        candles_df = pd.DataFrame(self.candles_data) # создание DataFrame из словаря
-        candles_df.to_csv('candles.csv', encoding='utf-8') # сохранение DataFrame в CSV файл
+                candles_df = pd.DataFrame(self.candles_data) # создание DataFrame из словаря
+                if cf:
+                    candles_df = pd.concat([cf, candles_df])
 
-        print('Файл свечей создан')
+                candles_df.to_csv('candles.csv', encoding='utf-8') # сохранение DataFrame в CSV файл
+
+                print('Файл свечей создан')
+
+                self.__get_fundamentals()
 
 
-    def get_fundamentals(self):
+    def __get_fundamentals(self):
         """Метод получения отчётностей по каждой акции"""
         with Client(self.token) as client:
             # получение фундаментальных данных
