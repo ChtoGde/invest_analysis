@@ -1,7 +1,6 @@
 from t_tech.invest import Client, CandleInterval, GetAssetFundamentalsRequest
 from datetime import datetime, timedelta
 import pandas as pd
-import os
 
 
 class MyClient(Client):
@@ -17,13 +16,13 @@ class MyClient(Client):
             # TQBR — аббревиатура, которая означает «Торги Квалифицированных Биржевых Рынков».
             # Это основной режим торгов на Московской бирже, предназначенный для торговли акциями.
             # for_qual_investor_flag = False - отбирает только акции, предназначенные для неквалифицированных инвесторов
-            self.tickers_figi = {share.ticker: share.figi for share in self.shares if share.class_code == 'TQBR' and not share.for_qual_investor_flag}
+            self.tickers_figi = {share.ticker: [share.figi, share.name] for share in self.shares if share.class_code == 'TQBR' and not share.for_qual_investor_flag}
             # получаем uid акций после фильтрации
             self.tickers_assets = {}
             for ticker, figi in self.tickers_figi.items():
                 for asset in self.assets:
                     for instrument in asset.instruments:
-                        if instrument.figi == figi:
+                        if instrument.figi == figi[0]:
                             self.tickers_assets[ticker] = asset.uid
 
 
@@ -34,30 +33,24 @@ class MyClient(Client):
 
             # сегодняшняя дата
             now = datetime.now()
-            # если файл существует, то берем дату последней свечи из файла
-            if os.path.exists('candles.csv'):
-                cf = pd.read_csv('candles.csv', index_col='Date', parse_dates=['Date'])
-                start_date = cf.index.max()
-            else:
-                # иначе берем 5 лет назад
-                start_date = now - timedelta(days=365*5)
+            # 5 лет назад
+            start_date = now - timedelta(days=365*5)
 
             if (now - start_date).days > 1:
                 # получаем свечи для каждого тикера за указанный срок
                 for ticker, figi in self.tickers_figi.items():
-                    candles = client.market_data.get_candles(figi=figi, from_=start_date, to=now, interval=CandleInterval.CANDLE_INTERVAL_DAY).candles
-                    df = pd.DataFrame([{
-                        "Date": candle.time.date(),
-                        "Close": self._quotation_to_float(candle.close) # берем только свечи закрытия
+                    candles = client.market_data.get_candles(figi=figi[0], from_=start_date, to=now, interval=CandleInterval.CANDLE_INTERVAL_DAY).candles
+                    df = pd.DataFrame([
+                        {
+                        'Date': candle.time.date(),
+                        'Close': self._quotation_to_float(candle.close) # берем только свечи закрытия
                         }
                         for candle in candles])
-                    df.set_index("Date", inplace=True) # установка индекса по 'Date'
+
+                    df = df.set_index('Date') # установка индекса по 'Date'
                     self.candles_data[ticker] = df["Close"]
 
                 candles_df = pd.DataFrame(self.candles_data) # создание DataFrame из словаря
-                if cf:
-                    candles_df = pd.concat([cf, candles_df])
-
                 candles_df.to_csv('candles.csv', encoding='utf-8') # сохранение DataFrame в CSV файл
 
                 print('Файл свечей создан')
@@ -108,3 +101,6 @@ class MyClient(Client):
     def _quotation_to_float(self, quotation):
         """Преобразует объект Quotation в float"""
         return round(quotation.units + quotation.nano / 1000000000, 2)
+
+    def get_ticker_and_names(self):
+        return [(ticker, name[1]) for ticker, name in self.tickers_figi.items()]
