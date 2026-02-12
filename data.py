@@ -15,14 +15,13 @@ class MyClient(Client):
             # Это основной режим торгов на Московской бирже, предназначенный для торговли акциями.
             # for_qual_investor_flag = False - отбирает только акции, предназначенные для неквалифицированных инвесторов.
             # на выходe получаем словарь с {тикер: {figi, name, UID}}
-            self.tickers_figi = {share.ticker: {'figi': share.figi, 'name': share.name,'UID': share.asset_uid} for share in self.shares if share.class_code == 'TQBR' and not share.for_qual_investor_flag}
+            self.tickers_TQBR_nocval = {share.ticker: {'figi': share.figi, 'name': share.name,'UID': share.asset_uid} for share in self.shares if share.class_code == 'TQBR' and not share.for_qual_investor_flag}
 
 
     def get_candles_and_fundamentals(self):
         """Метод получения свечей за 5 лет с сохранением в .csv и последующим его обновлением"""
         with Client(self.token) as client:
             self.candles_data = {}
-            is_create_new_file = False
 
             # дата на сегодняшний день
             now = datetime.now()
@@ -30,17 +29,18 @@ class MyClient(Client):
             try:
                 # пробуем выгрузить данные из файла
                 old_candles_df = pd.read_csv('candles.csv', index_col='Date', parse_dates=['Date'])
-                # дата последней свечи
-                start_date = old_candles_df.index[-1] + timedelta(days=1)
+                # количество дней без обновления данных
+                days = (now - old_candles_df.index[-1]).days
 
             except FileNotFoundError:
-                # если файла нет, то берем данные за 5 лет
-                start_date = now - timedelta(days=365*5)
-                is_create_new_file = True
+                days = 2
 
-            if (now - start_date).days > 1:
+            # дата 5 лет назад
+            start_date = now - timedelta(days=365*5)
+
+            if days > 1:
                 # получаем свечи для каждого тикера за указанный срок
-                for ticker, values in self.tickers_figi.items():
+                for ticker, values in self.tickers_TQBR_nocval.items():
                     candles = client.market_data.get_candles(figi=values['figi'], from_=start_date, to=now, interval=CandleInterval.CANDLE_INTERVAL_DAY).candles
                     df = pd.DataFrame([
                         {
@@ -53,28 +53,22 @@ class MyClient(Client):
                     self.candles_data[ticker] = df["Close"]
 
                  # объединение DataFrame
-                new_candles_df = pd.DataFrame(self.candles_data) # создание DataFrame из словаря
-
-                if is_create_new_file:
-                    candles_df = new_candles_df
-                else:
-                    candles_df = pd.concat([old_candles_df, new_candles_df])
-
+                candles_df = pd.DataFrame(self.candles_data) # создание DataFrame из словаря
                 candles_df.to_csv('candles.csv', encoding='utf-8') # сохранение DataFrame в CSV файл
 
                 print('Файл свечей создан')
 
-                self.__get_fundamentals()
+                self._get_fundamentals()
             else:
                 print('Данные не требуют обновления.')
 
 
-    def __get_fundamentals(self):
+    def _get_fundamentals(self):
         """Метод получения отчётностей по каждой акции"""
         with Client(self.token) as client:
             # получение фундаментальных данных
             self.fundamentals_data = {}
-            for ticker, values in self.tickers_figi.items():
+            for ticker, values in self.tickers_TQBR_nocval.items():
                 #uid = self.tickers_assets[ticker]
                 fundamentals = client.instruments.get_asset_fundamentals(request=GetAssetFundamentalsRequest(assets=[values['UID']],)).fundamentals
 
@@ -114,4 +108,4 @@ class MyClient(Client):
         return round(quotation.units + quotation.nano / 1000000000, 2)
 
     def get_ticker_and_names(self):
-        return [(ticker, name[1]) for ticker, name in self.tickers_figi.items()]
+        return [(ticker, values['name']) for ticker, values in self.tickers_TQBR_nocval.items()]
