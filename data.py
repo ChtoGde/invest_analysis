@@ -33,7 +33,7 @@ class MyClient(Client):
                 days = (now - old_candles_df.index[-1]).days
 
             except FileNotFoundError:
-                days = 2
+                days = now - timedelta(days=365*5)
 
             # дата 5 лет назад
             start_date = now - timedelta(days=365*5)

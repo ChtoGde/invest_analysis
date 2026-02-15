@@ -3,8 +3,3 @@ venv
 __pycache__
 Analysis.ipynb
 tokens.py
-test.ipynb
-extract_news.py
-filtred_news.json
-news_filter_session.session
-news_filter_session.session-journal
