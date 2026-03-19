@@ -33,12 +33,12 @@ class MyClient(Client):
                 days = (now - old_candles_df.index[-1]).days
 
             except FileNotFoundError:
-                days = now - timedelta(days=365*5)
+                days = (now - timedelta(days=365*3)).day
 
             # дата 5 лет назад
-            start_date = now - timedelta(days=365*5)
+            start_date = now - timedelta(days=365*3)
 
-            if days > 1:
+            if days > 2:
                 # получаем свечи для каждого тикера за указанный срок
                 for ticker, values in self.tickers_TQBR_nocval.items():
                     candles = client.market_data.get_candles(figi=values['figi'], from_=start_date, to=now, interval=CandleInterval.CANDLE_INTERVAL_DAY).candles

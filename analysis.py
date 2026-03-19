@@ -174,7 +174,7 @@ class Analysis():
         for ticker in stock_tracker_0.index:
             if ticker not in signals[['Акция']]:
                 stock_tracker_0.loc[ticker, 'Актуальная цена'] = self.__prices[ticker].iloc[-1]
-                stock_tracker_0.loc[ticker,'Изменение (%)'] = round((stock_tracker_0.loc[ticker, 'Актуальная цена'] - stock_tracker_0.loc[ticker, 'Начальная цена']) / stock_tracker_0.loc[ticker,'Начальная цена'] * 100, 1)
+                stock_tracker_0.loc[ticker,'Изменение (%)'] = round((stock_tracker_0.loc[ticker, 'Актуальная цена'] - stock_tracker_0.loc[ticker, 'Начальная цена']) / stock_tracker_0.loc[ticker,'Начальная цена'] * 100, 2)
 
         for ticker, sign, price in signals[['Акция','Сигнал', 'Актуальная цена']].itertuples(index=False):
             # если тикер уже в файле
@@ -184,14 +184,14 @@ class Analysis():
                     # то обновляем поля "Дата", "Актуальная цена" и "Изменение (%)"
                     stock_tracker_0.loc[ticker,'Дата'] = pd.Timestamp.now().normalize()
                     stock_tracker_0.loc[ticker,'Актуальная цена'] = price
-                    stock_tracker_0.loc[ticker,'Изменение (%)'] = round((stock_tracker_0.loc[ticker, 'Актуальная цена'] - stock_tracker_0.loc[ticker, 'Начальная цена']) / stock_tracker_0.loc[ticker,'Начальная цена'] * 100, 1)
+                    stock_tracker_0.loc[ticker,'Изменение (%)'] = round((stock_tracker_0.loc[ticker, 'Актуальная цена'] - stock_tracker_0.loc[ticker, 'Начальная цена']) / stock_tracker_0.loc[ticker,'Начальная цена'] * 100, 2)
                 # если сигнал не совпадает то переносим данные в лист "Trade_history"
                 elif stock_tracker_0.loc[ticker, 'Сигнал'] != sign:
                     # Задаём новые поля "Акция", "Сигнал", "Цена", "Результат(%)", "Кол-во дней"(сколько сигнал просуществовал не меняясь)
                     stock_tracker_1 = pd.concat([stock_tracker_1, pd.DataFrame([{'Акция': ticker}]).set_index('Акция')])
                     stock_tracker_1.loc[ticker, 'Сигнал'] = stock_tracker_0.loc[ticker, 'Сигнал']
                     stock_tracker_1.loc[ticker, 'Цена'] = price
-                    stock_tracker_1.loc[ticker, 'Результат(%)'] = round((price - stock_tracker_0.loc[ticker, 'Начальная цена']) / stock_tracker_0.loc[ticker,'Начальная цена'] * 100, 1)
+                    stock_tracker_1.loc[ticker, 'Результат(%)'] = round((price - stock_tracker_0.loc[ticker, 'Начальная цена']) / stock_tracker_0.loc[ticker,'Начальная цена'] * 100, 2)
                     stock_tracker_1.loc[ticker, 'Кол-во дней'] = (datetime.now().date() - stock_tracker_0.loc[ticker, 'Дата рекомендации'].to_pydatetime().date()).days
                     # удаляем тикер из листа "Recommendations"
                     stock_tracker_0.drop(ticker, inplace=True)
@@ -269,21 +269,21 @@ class Analysis():
 
 
     def __rsi(self, series, window=14):
-        """Метод расчета RSI"""
+        """Метод расчёта RSI"""
         delta = series.diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
-        rs = gain / loss.replace(0, np.nan)  # Избежание деления на 0
+        gain = (delta.where(delta > 0, 0)).ewm(alpha=1/window, adjust=False).mean()
+        loss = (-delta.where(delta < 0, 0)).ewm(alpha=1/window, adjust=False).mean()
+        rs = gain / loss.replace(0, np.nan)
         rsi = 100 - (100 / (1 + rs))
-        return rsi
+        return rsi.fillna(100)
 
 
     def __z_score(self, series, window=60):
         """Метод расчета Z-Score"""
         mean = series.rolling(window=window).mean()
         std = series.rolling(window=window).std()
-        z = (series - mean) / std
-        return z
+        z = (series - mean) / std.replace(0, np.nan)
+        return z.fillna(0)
 
 
     def __support_resistance(self, series, window=200):
