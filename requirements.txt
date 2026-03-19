@@ -3,3 +3,4 @@ numpy==1.26.4
 scikit-learn==1.8.0
 openpyxl==3.1.5
 t-tech-investments==0.3.3
+psycopg2==2.9.11

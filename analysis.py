@@ -66,7 +66,7 @@ class Analysis():
         self.__cleaned = self.__cleaned.join(norm_metrics[['ROE_score', 'P/E_score', 'Div_score']])
 
 
-    def recomendations(self):
+    def recommendations(self):
         """Основная функция анализа акций и создания рекомендаций"""
         results = []
 
@@ -126,8 +126,15 @@ class Analysis():
             # Сигналы
             buy_signal = (score >= 6) and (not pd.isna(calc_rsi)) and (calc_rsi < 50) and (pe < 15) and (roe > 10)
             sell_signal = (not pd.isna(calc_rsi)) and (calc_rsi > 70) and (not pd.isna(calc_z)) and (calc_z > 2)
+            signal = None
+            if buy_signal:
+                signal = 'buy'
+            elif sell_signal:
+                signal = 'sell'
+            else:
+                signal = 'hold'
             # Цены для лучшей покупки и продажи
-            # ideal_buy_price = max(support, current_price * 0.95, (support + current_price) / 2)
+            ideal_buy_price = max(support, current_price * 0.95, (support + current_price) / 2)
             ideal_sell_price = min(resistance, current_price * 1.20)
 
             # Формируем результат
@@ -136,27 +143,24 @@ class Analysis():
                 'Актуальная цена': round(current_price, 2),
                 'Поддержка': round(support, 2),
                 'Сопротивление': round(resistance, 2),
-                #'Покупать по': round(ideal_buy_price, 2),
+                'Покупать по': round(ideal_buy_price, 2),
                 'Продавать по': round(ideal_sell_price, 2),
                 'RSI': round(calc_rsi, 2) if not pd.isna(calc_rsi) else None,
                 'Z-Score': round(calc_z, 2) if not pd.isna(calc_z) else None,
                 'P/E': round(pe, 2),
                 'ROE': round(roe, 2),
                 'Div Yield': round(div_yield, 2),
-                'Сигнал к покупке': '✅ Да' if buy_signal else '❌ Нет',
-                'Сигнал к продаже': '✅ Да' if sell_signal else '❌ Нет',
+                'Сигнал': signal,
                 'Score': round(score, 2)
             })
 
-        recomendations = pd.DataFrame(results)
+        self.recommendations = pd.DataFrame(results)
         # генерируем список "к покупке"
-        buy_list = recomendations[recomendations['Сигнал к покупке'] == '✅ Да'].copy()
-        buy_list = buy_list.sort_values(by='Score', ascending=False)
+        buy_list = self.recommendations[self.recommendations['Сигнал'] == 'buy'].copy()
+        self.buy_list = buy_list.sort_values(by='Score', ascending=False)
         # генерируем список "к продаже"
-        sell_list = recomendations[recomendations['Сигнал к продаже'] == '✅ Да'].copy()
-        sell_list = sell_list.sort_values(by='RSI', ascending=False)
-
-        return buy_list, sell_list
+        sell_list = self.recommendations[self.recommendations['Сигнал'] == 'sell'].copy()
+        self.sell_list = sell_list.sort_values(by='RSI', ascending=False)
 
 
     def save_to_excel(self, buy_list, sell_list):
@@ -171,11 +175,13 @@ class Analysis():
         stock_tracker_0 = pd.read_excel('stock_tracker.xlsx', index_col='Акция', sheet_name=0, parse_dates=['Дата рекомендации', 'Дата'])
         stock_tracker_1 = pd.read_excel('stock_tracker.xlsx', index_col='Акция', sheet_name=1)
 
+        # эта часть кода продолжает обновлять данные уже вписаных в ексель тикеро, даже если их сейчас нет в сигналах
         for ticker in stock_tracker_0.index:
             if ticker not in signals[['Акция']]:
                 stock_tracker_0.loc[ticker, 'Актуальная цена'] = self.__prices[ticker].iloc[-1]
                 stock_tracker_0.loc[ticker,'Изменение (%)'] = round((stock_tracker_0.loc[ticker, 'Актуальная цена'] - stock_tracker_0.loc[ticker, 'Начальная цена']) / stock_tracker_0.loc[ticker,'Начальная цена'] * 100, 2)
 
+        # обновление данных таблиц
         for ticker, sign, price in signals[['Акция','Сигнал', 'Актуальная цена']].itertuples(index=False):
             # если тикер уже в файле
             if ticker in stock_tracker_0.index:
@@ -188,11 +194,11 @@ class Analysis():
                 # если сигнал не совпадает то переносим данные в лист "Trade_history"
                 elif stock_tracker_0.loc[ticker, 'Сигнал'] != sign:
                     # Задаём новые поля "Акция", "Сигнал", "Цена", "Результат(%)", "Кол-во дней"(сколько сигнал просуществовал не меняясь)
-                    stock_tracker_1 = pd.concat([stock_tracker_1, pd.DataFrame([{'Акция': ticker}]).set_index('Акция')])
-                    stock_tracker_1.loc[ticker, 'Сигнал'] = stock_tracker_0.loc[ticker, 'Сигнал']
-                    stock_tracker_1.loc[ticker, 'Цена'] = price
-                    stock_tracker_1.loc[ticker, 'Результат(%)'] = round((price - stock_tracker_0.loc[ticker, 'Начальная цена']) / stock_tracker_0.loc[ticker,'Начальная цена'] * 100, 2)
-                    stock_tracker_1.loc[ticker, 'Кол-во дней'] = (datetime.now().date() - stock_tracker_0.loc[ticker, 'Дата рекомендации'].to_pydatetime().date()).days
+                    new_stock = pd.DataFrame([{'Акция': ticker}]).set_index('Акция')
+                    new_stock['Сигнал'] = stock_tracker_0.loc[ticker, 'Сигнал']
+                    new_stock['Результат(%)'] = round((price - stock_tracker_0.loc[ticker, 'Начальная цена']) / stock_tracker_0.loc[ticker,'Начальная цена'] * 100, 2)
+                    new_stock['Кол-во дней'] = (datetime.now().date() - stock_tracker_0.loc[ticker, 'Дата рекомендации'].to_pydatetime().date()).days
+                    stock_tracker_1 = pd.concat([stock_tracker_1, new_stock])
                     # удаляем тикер из листа "Recommendations"
                     stock_tracker_0.drop(ticker, inplace=True)
             # если тикера нет в файле:
@@ -206,11 +212,11 @@ class Analysis():
 
         # запись в Exel файл
         with pd.ExcelWriter('stock_tracker.xlsx', engine='openpyxl', mode='w') as writer:
-            stock_tracker_0.to_excel(writer, index=True, sheet_name='Recomendations')
+            stock_tracker_0.to_excel(writer, index=True, sheet_name='Recommendations')
             stock_tracker_1.to_excel(writer, index=True, sheet_name='Trade_History')
 
 
-            ws0 = writer.sheets['Recomendations']
+            ws0 = writer.sheets['Recommendations']
 
             green_fill = PatternFill(start_color='C6EFCE', end_color='C6EFCE', fill_type='solid')  # Светло‑зелёный
             red_fill = PatternFill(start_color='FFC7CE', end_color='FFC7CE', fill_type='solid')    # Светло‑красный
@@ -291,3 +297,18 @@ class Analysis():
         support = series.rolling(window=window).min()
         resistance = series.rolling(window=window).max()
         return support.iloc[-1], resistance.iloc[-1]
+
+
+    def get_recommendations(self):
+        """Получение рекомендаций"""
+        return self.recommendations
+
+
+    def get_buy_list(self):
+        """Получения списка покупок"""
+        return self.buy_list
+
+
+    def get_sell_list(self):
+        """Получение списка продаж"""
+        return self.sell_list

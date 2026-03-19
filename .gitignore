@@ -2,4 +2,6 @@ venv
 .ipynb_checkpoints
 __pycache__
 Visualisation.ipynb
-tokens.py
+tokens_and_passwords.py
+fundamentals.csv
+candles.csv
